@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows.Forms;
 
 namespace NLog.Windows.Forms
@@ -150,6 +151,64 @@ namespace NLog.Windows.Forms
                 return new Icon(stream);
             }
         }
+
+#region Hidden Text support
+        /// <summary>
+        /// Retrieve the text in plaintext form, but including hidden text.
+        /// </summary>
+        /// <param name="textBox">target control</param>
+        /// <returns>the text in the control including hidden text</returns>
+        internal static string GetTextWithHiddenText(RichTextBox textBox)
+        {
+#if NETCOREAPP3_0 || NETCOREAPP3_1
+            // .NET Core 3.x requires a workaround (also required in .NET 4.7+ which by default is configured to not use the classic RTF control)
+            // The implementation is taken from .NET 5 RichTextBox.Text accessor which restored the old behavior of returning hidden text.
+            var lengthRequest = new GETTEXTLENGTHEX();
+            lengthRequest.codepage = 1200; // UNICODE
+            var expectedLength = SendMessage(textBox.Handle, EM_GETTEXTLENGTHEX, ref lengthRequest, IntPtr.Zero).ToInt64();
+            var buffer = new StringBuilder(checked((int)expectedLength + 1));
+            var textRequest = new GETTEXTEX();
+            textRequest.codepage = 1200; // UNICODE
+            textRequest.cb = buffer.Capacity * sizeof(char);
+            var actualLength = SendMessage(textBox.Handle, EM_GETTEXTEX, ref textRequest, buffer).ToInt64();
+            if (actualLength > expectedLength)
+                throw new OutOfMemoryException();
+            for (int index = 0; index < actualLength; index++)
+                if (buffer[index] == '\r')
+                    buffer[index] = '\n';
+            return buffer.ToString(0, checked((int)actualLength));
+#else
+            // Desktop Framework and .NET 5+ do this by default (Desktop Framework requires the classic RTF control, which is default up to .NET 4.6.x but needs an app.config setting for .NET 4.7+) 
+            return textBox.Text;
+#endif
+        }
+
+        private const int EM_GETTEXTEX = WM_USER + 94;
+        private const int EM_GETTEXTLENGTHEX = WM_USER + 95;
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, ref GETTEXTLENGTHEX wParam, IntPtr lParam);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, ref GETTEXTEX wParam, StringBuilder lParam);
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct GETTEXTLENGTHEX
+        {
+            public int flags;
+            public int codepage;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct GETTEXTEX
+        {
+            public int cb;
+            public int flags;
+            public int codepage;
+            public IntPtr lpDefaultChar;
+            public IntPtr lpUsedDefChar;
+        }
+#endregion
 
 #region Link support
         /// <summary>

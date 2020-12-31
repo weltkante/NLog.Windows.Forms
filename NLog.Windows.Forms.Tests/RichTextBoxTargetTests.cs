@@ -353,7 +353,7 @@ namespace NLog.Windows.Forms.Tests
                 Application.DoEvents();
                 string expectedText = "Test 93\nTest 94\nTest 95\nTest 96\nTest 97\nTest 98\nTest 99\n";
 
-                Assert.Equal(expectedText, target.TargetRichTextBox.Text);
+                Assert.Equal(expectedText, ExtractText(target.TargetRichTextBox));
             }
             finally
             {
@@ -1065,11 +1065,7 @@ namespace NLog.Windows.Forms.Tests
             Assert.Matches(@"(\([a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}\))", result);  //the placeholder GUID was not replaced by was not replaced because of SupportLinks set to false
         }
 
-#if NETCOREAPP3_0 || NETCOREAPP3_1
-        [Fact(Skip = ".NET Core 3.x does not support links")]
-#else
         [Fact]
-#endif
         public void LinkTest()
         {
             RichTextBoxTarget target = new RichTextBoxTarget()
@@ -1091,7 +1087,7 @@ namespace NLog.Windows.Forms.Tests
             Assert.Same(target, RichTextBoxTarget.GetTargetByControl(target.TargetRichTextBox));
 
             string resultRtf = ExtractRtf(target.TargetRichTextBox);
-            string resultText = target.TargetRichTextBox.Text;
+            string resultText = ExtractText(target.TargetRichTextBox);
             Assert.DoesNotMatch(@"(\([a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}\))", resultRtf);  //the placeholder GUID was replaced
             Assert.Contains("descr#link", resultText);  //text contains visible and invisible parts
 #if NETCOREAPP
@@ -1101,11 +1097,7 @@ namespace NLog.Windows.Forms.Tests
 #endif
         }
 
-#if NETCOREAPP3_0 || NETCOREAPP3_1
-        [Fact(Skip = ".NET Core 3.x does not support links")]
-#else
         [Fact]
-#endif
         public void LinkTestConditional()
         {
             RichTextBoxTarget target = new RichTextBoxTarget()
@@ -1128,7 +1120,7 @@ namespace NLog.Windows.Forms.Tests
 
             //check first event
             {
-                string resultText = target.TargetRichTextBox.Text;
+                string resultText = ExtractText(target.TargetRichTextBox);
                 string resultRtf = ExtractRtf(target.TargetRichTextBox);
                 Assert.Contains("TestNoLink", resultText);
                 Assert.DoesNotContain("#link", resultText);  //no link for first event
@@ -1150,7 +1142,7 @@ namespace NLog.Windows.Forms.Tests
 
             //check second event
             {
-                string resultText = target.TargetRichTextBox.Text;
+                string resultText = ExtractText(target.TargetRichTextBox);
                 string resultRtf = ExtractRtf(target.TargetRichTextBox);
 #if NETCOREAPP
                 Assert.Contains("TestWithLink HYPERLINK \"marker_text#link", resultText);  //link for a second event
@@ -1162,11 +1154,7 @@ namespace NLog.Windows.Forms.Tests
             }
         }
 
-#if NETCOREAPP3_0 || NETCOREAPP3_1
-        [Fact(Skip = ".NET Core 3.x does not support links")]
-#else
         [Fact]
-#endif
         public void LinkTestExcessLinksRemoved()
         {
             RichTextBoxTarget target = new RichTextBoxTarget()
@@ -1193,7 +1181,7 @@ namespace NLog.Windows.Forms.Tests
             }
             Application.DoEvents();
 
-            string resultText = target.TargetRichTextBox.Text;
+            string resultText = ExtractText(target.TargetRichTextBox);
             string resultRtf = ExtractRtf(target.TargetRichTextBox);
             Assert.Contains("#link", resultText);  //some links exist
 #if NETCOREAPP
@@ -1205,11 +1193,7 @@ namespace NLog.Windows.Forms.Tests
             Assert.True(target.LinkedEventsCount == target.MaxLines); //storing 5, not 100 events
         }
 
-#if NETCOREAPP3_0 || NETCOREAPP3_1
-        [Fact(Skip = ".NET Core 3.x does not support links")]
-#else
         [Fact]
-#endif
         public void LinkClickTest()
         {
             RichTextBoxTarget target = new RichTextBoxTarget()
@@ -1229,7 +1213,7 @@ namespace NLog.Windows.Forms.Tests
             Application.DoEvents();
 
             Assert.Same(target, RichTextBoxTarget.GetTargetByControl(target.TargetRichTextBox));
-            Assert.Contains("link", target.TargetRichTextBox.Text);
+            Assert.Contains("link", ExtractText(target.TargetRichTextBox));
 
             bool linkClickedFromHandler = false;
             string linkTextFromHandler = null;
@@ -1304,12 +1288,14 @@ namespace NLog.Windows.Forms.Tests
         }
         #endregion
 
-        private static string ExtractRtf(RichTextBox conrol)
+        private static string ExtractText(RichTextBox control)
         {
-            MemoryStream ms = new MemoryStream();
-            conrol.SaveFile(ms, RichTextBoxStreamType.RichText);
-            string resultRtf = Encoding.UTF8.GetString(ms.GetBuffer());
-            return resultRtf;
+            return FormHelper.GetTextWithHiddenText(control);
+        }
+
+        private static string ExtractRtf(RichTextBox control)
+        {
+            return control.Rtf;
         }
 
         private static void InvokeLambda(Control control, Action action)
